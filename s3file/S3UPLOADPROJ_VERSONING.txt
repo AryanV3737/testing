@@ -1,0 +1,513 @@
+Direct Upload via HTTP: You can create an API using Amazon API Gateway, and clients can send files to your Lambda function by making HTTP POST requests. The Lambda function can then handle the file upload and store it in an S3 bucket.
+
+Binary Stream 
+Base 64 encoded 
+
+
+-------ABOUT THE CODE THAT IS MENTIONED BELOW ---------------------------------
+The code you provided in your previous message does not directly use the Direct Upload via HTTP method to get the file. Instead, it appears to use an AWS Lambda function triggered by an S3 event to upload files to an S3 bucket.
+
+package com.minfy.s3file;
+
+import com.amazonaws.HttpMethod;
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.S3Event;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.services.s3.model.ResponseHeaderOverrides;
+import java.io.InputStream;
+import java.util.Date;
+
+public class UploadToS3Bucket implements RequestHandler<S3Event, String> {
+
+    private static final String BUCKET_NAME = "your-s3-bucket-name";
+    private static final String REGION = "your-aws-region";
+
+    @Override
+    public String handleRequest(S3Event s3Event, Context context) {
+        try {
+            // Initialize S3 client
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(REGION)
+                    .build();
+
+            // Retrieve the S3 object key and file name
+            String s3ObjectKey = s3Event.getRecords().get(0).getS3().getObject().getKey();
+            String fileName = s3ObjectKey.substring(s3ObjectKey.lastIndexOf("/") + 1);
+
+            // Upload the file to the S3 bucket
+            InputStream inputStream = getClass().getResourceAsStream("/" + fileName);
+            s3Client.putObject(new PutObjectRequest(BUCKET_NAME, s3ObjectKey, inputStream, null));
+
+            //Generate a presigned URL for the uploaded object
+            Date expiration = new Date(System.currentTimeMillis() + 3600000); // URL expiration time (1 hour)
+            GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(BUCKET_NAME, s3ObjectKey)
+                    .withMethod(HttpMethod.GET)
+                    .withExpiration(expiration);
+
+            String presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest).toString();
+
+            // Append the HTTP method to the presigned URL
+            presignedUrl += "?method=GET";
+            
+            // Add optional parameters to the presigned URL
+            ResponseHeaderOverrides headerOverrides = new ResponseHeaderOverrides();
+            headerOverrides.setContentType("application/octet-stream");
+            generatePresignedUrlRequest.setResponseHeaders(headerOverrides);
+
+            return "File uploaded successfully. Presigned URL: " + presignedUrl;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error: " + e.getMessage();
+        }
+    }
+}
+
+
+
+
+IAN POLICY NAME - mytestS3lambdaIAMpolicy
+
+
+
+
+**************************************************************************************************************************************************************************************************************2ND WAY WHERE WE ARE USING THE HTTP POST METHOD TO TAKE THE FILE 
+
+
+package com.minfy.s3file;
+
+import com.amazonaws.HttpMethod;
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Date;
+import java.util.UUID;	
+
+public class UploadToS3Bucket implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+
+    private static final String BUCKET_NAME = "mys3testbuck1";   //write the bucket name here 
+    private static final String REGION = "ap-south-1";				//write the region name here 
+
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent request, Context context) {
+        try {
+            // Initialize S3 client
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(REGION)
+                    .build();
+
+            // Generate a unique object key (e.g., using UUID)
+            String objectKey = "uploads/" + UUID.randomUUID().toString();
+
+            // Extract the file content from the HTTP request body
+            String fileContent = request.getBody();
+
+            // Create an input stream from the file content
+            InputStream inputStream = new ByteArrayInputStream(fileContent.getBytes());
+
+            // Set the content type and content length
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType("application/octet-stream");
+            metadata.setContentLength(fileContent.length());
+
+            // Upload the file to the S3 bucket
+            s3Client.putObject(new PutObjectRequest(BUCKET_NAME, objectKey, inputStream, metadata));
+
+            // Generate a presigned URL for the uploaded object
+            Date expiration = new Date(System.currentTimeMillis() + 3600000); // URL expiration time (1 hour)
+            GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(BUCKET_NAME, objectKey)
+                    .withMethod(HttpMethod.GET)
+                    .withExpiration(expiration);
+
+            URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+            // Build the response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(200);
+            response.setBody("File uploaded successfully to S3: " + objectKey);
+            
+            // Include the presigned URL in the response
+            response.setHeaders(java.util.Collections.singletonMap("Presigned-URL", presignedUrl.toString()));
+
+            return response;
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Return an error response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(500);
+            response.setBody("Error: " + e.getMessage());
+
+            return response;
+        }
+    }
+}
+
+
+
+
+************************************************************************************************************************************************************************************************************************************************************************************************************************
+CREATING THE LAMBDA FUNCTION THAT WILL TAKE THE FILE DATA AS A DIRECT APPROACH WHERE IT TAKES INPUT DATA AS AN FILE DATA 
+DIRECT UPLOAD APPROACH 
+
+package com.minfy.s3file;
+
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.S3Event;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+
+import java.io.ByteArrayInputStream;
+
+public class UploadToS3Bucket implements RequestHandler<InputData, String> {
+
+    private static final String BUCKET_NAME = "mys3testbuck1";
+    private static final String REGION = "ap-south-1";
+
+    @Override
+    public String handleRequest(InputData inputData, Context context) {
+        try {
+            // Extract data from the input object
+            String data = inputData.getInputData();
+
+            // Initialize S3 client
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(REGION)
+                    .build();
+
+            // Generate a unique S3 object key
+            String uniqueKey = "your-prefix/" + System.currentTimeMillis(); // You can customize the key as needed
+
+            // Create a new object in the S3 bucket with the input data
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(data.getBytes());
+            PutObjectRequest putObjectRequest = new PutObjectRequest(BUCKET_NAME, uniqueKey, inputStream, null);
+
+            s3Client.putObject(putObjectRequest);
+
+            String s3ObjectUrl = "https://" + BUCKET_NAME + ".s3-" + REGION + ".amazonaws.com/" + uniqueKey;
+
+            return "Data uploaded to S3. S3 Object URL: " + s3ObjectUrl;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error: " + e.getMessage();
+        }
+    }
+}
+
+
+
+
+
+---------------------------------> 
+
+package com.minfy.s3file;
+
+public class InputData {
+    private String inputData;
+
+    public String getInputData() {
+        return inputData;
+    }
+
+    public void setInputData(String inputData) {
+        this.inputData = inputData;
+    }
+}
+
+
+
+*****************************************************************************************************************************************************************88******THIS IS THE MOST NEAR CODE JUST NEED ANOTHER PROGRAM WEATHER THAT CAN WORK OR NOT 
+
+package com.minfy.s3file;
+
+import com.amazonaws.HttpMethod;
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Date;
+import java.util.UUID;
+
+public class UploadToS3Bucket implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+
+    private static final String BUCKET_NAME = "mys3testbuck1"; // write the bucket name here
+    private static final String REGION = "ap-south-1"; // write the region name here
+
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent request, Context context) {
+        try {
+            // Initialize S3 client
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(REGION)
+                    .build();
+
+            // Generate a unique object key (e.g., using UUID)
+            String objectKey = "uploads/" + UUID.randomUUID().toString();
+
+            // Extract the file content from the HTTP request body
+            String fileContent = request.getBody();
+
+            if (fileContent != null && !fileContent.isEmpty()) {
+                // Create an input stream from the file content
+                InputStream inputStream = new ByteArrayInputStream(fileContent.getBytes());
+
+                // Set the content type and content length
+                ObjectMetadata metadata = new ObjectMetadata();
+                metadata.setContentType("application/octet-stream");
+                metadata.setContentLength(fileContent.length());
+
+                // Upload the file to the S3 bucket
+                s3Client.putObject(new PutObjectRequest(BUCKET_NAME, objectKey, inputStream, metadata));
+
+                // Generate a presigned URL for the uploaded object
+                Date expiration = new Date(System.currentTimeMillis() + 3600000); // URL expiration time (1 hour)
+                GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(BUCKET_NAME, objectKey)
+                        .withMethod(HttpMethod.GET)
+                        .withExpiration(expiration);
+
+                URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+                // Build the response
+                APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+                response.setStatusCode(200);
+                response.setBody("File uploaded successfully to S3: " + objectKey);
+
+                // Include the presigned URL in the response
+                response.setHeaders(java.util.Collections.singletonMap("Presigned-URL", presignedUrl.toString()));
+
+                return response;
+            } else {
+                // Handle the case where the request body is null or empty
+                APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+                response.setStatusCode(400); // You can choose an appropriate status code
+                response.setBody("Error: Request body is null or empty.");
+                return response;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Return an error response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(500);
+            response.setBody("Error: " + e.getMessage());
+
+            return response;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package com.minfy.s3file;
+
+import com.amazonaws.HttpMethod;
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Date;
+import java.util.UUID;	
+
+public class UploadToS3Bucket implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+
+    private static final String BUCKET_NAME = "mys3testbuck1";   //write the bucket name here 
+    private static final String REGION = "ap-south-1";				//write the region name here 
+
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent request, Context context) {
+        try {
+            // Initialize S3 client
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(REGION)
+                    .build();
+
+            // Generate a unique object key (e.g., using UUID)
+            String objectKey = "uploads/" + UUID.randomUUID().toString();
+
+            // Extract the file content from the HTTP request body
+            String fileContent = request.getBody();
+
+            // Create an input stream from the file content
+            InputStream inputStream = new ByteArrayInputStream(fileContent.getBytes());
+
+            // Set the content type and content length
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType("application/octet-stream");
+            metadata.setContentLength(fileContent.length());
+
+            // Upload the file to the S3 bucket
+            s3Client.putObject(new PutObjectRequest(BUCKET_NAME, objectKey, inputStream, metadata));
+
+            // Generate a presigned URL for the uploaded object
+            Date expiration = new Date(System.currentTimeMillis() + 3600000); // URL expiration time (1 hour) we can change it 
+            GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(BUCKET_NAME, objectKey)
+                    .withMethod(HttpMethod.GET)
+                    .withExpiration(expiration);
+
+            URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+            // Build the response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(200);
+            response.setBody("File uploaded successfully to S3: " + objectKey);
+            
+            // Include the presigned URL in the response
+            response.setHeaders(java.util.Collections.singletonMap("Presigned-URL", presignedUrl.toString()));
+
+            return response;
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Return an error response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(500);
+            response.setBody("Error: " + e.getMessage());
+
+            return response;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+***************************************************************************************************************************************************************************************************************************************************************************************************************************THIS IS THE CODE THAT IS STORING THE PDF AS A PDF IN S3 NOT NEEDED MOSTLY 
+
+
+package com.minfy.s3file;
+
+import com.amazonaws.HttpMethod;
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Date;
+import java.util.UUID;
+
+public class UploadToS3Bucket implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+
+    private static final String BUCKET_NAME = "mys3testbuck1";   // Write the bucket name here
+    private static final String REGION = "ap-south-1";           // Write the region name here
+
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent request, Context context) {
+        try {
+            // Initialize S3 client
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(REGION)
+                    .build();
+
+            // Generate a unique object key (e.g., using UUID)
+            String objectKey = "uploads/" + UUID.randomUUID().toString() + ".pdf";  // Specify the .pdf extension
+
+            // Extract the file content from the HTTP request body
+            String fileContent = request.getBody();
+
+            // Convert the string content to bytes
+            byte[] byteArray = fileContent.getBytes("UTF-8");
+
+            // Create an input stream from the byte array
+            InputStream inputStream = new ByteArrayInputStream(byteArray);
+
+            // Set the content type as "application/pdf"
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType("application/pdf");
+
+            // Upload the PDF to the S3 bucket
+            s3Client.putObject(new PutObjectRequest(BUCKET_NAME, objectKey, inputStream, metadata));
+
+            // Generate a presigned URL for the uploaded PDF
+            Date expiration = new Date(System.currentTimeMillis() + 3600000); // URL expiration time (1 hour) - you can change it
+            GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(BUCKET_NAME, objectKey)
+                    .withMethod(HttpMethod.GET)
+                    .withExpiration(expiration);
+
+            URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+            // Build the response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(200);
+            response.setBody("PDF uploaded successfully to S3: " + objectKey);
+
+            // Include the presigned URL in the response
+            response.setHeaders(java.util.Collections.singletonMap("Presigned-URL", presignedUrl.toString()));
+
+            return response;
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Return an error response
+            APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+            response.setStatusCode(500);
+            response.setBody("Error: " + e.getMessage());
+
+            return response;
+        }
+    }
+}

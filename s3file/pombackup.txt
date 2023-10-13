@@ -1,0 +1,256 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.minfy</groupId>
+  <artifactId>userdetailapi</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.6.0</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+          <encoding>UTF-8</encoding>
+          <forceJavacCompilerUse>true</forceJavacCompilerUse>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <name>userdetailapi</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <thin.archive>true</thin.archive>
+  </properties>
+  
+   <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk-bom</artifactId>
+        <version>1.11.699</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+	
+    <!-- https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-dynamodb -->
+	<dependency>
+	    <groupId>com.amazonaws</groupId>
+	    <artifactId>aws-java-sdk-dynamodb</artifactId>
+	    <version>1.12.542</version>
+	</dependency>
+
+	<dependency>
+	    <groupId>com.amazonaws</groupId>
+	    <artifactId>aws-java-sdk</artifactId>
+	    <version>1.11.1022</version> <!-- Use the appropriate version -->
+	</dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.12</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-lambda-java-events</artifactId>
+      <version>1.3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-lambda-java-core</artifactId>
+      <version>1.1.0</version>
+    </dependency>
+  </dependencies>
+</project>
+
+---------------------------------------------------------------------------------------
+
+removed 2 dependency from it 
+
+<!-- https://mvnrepository.com/artifact/com.amazonaws/aws-lambda-java-events -->
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-lambda-java-events</artifactId>
+      <version>3.11.2</version>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/com.amazonaws/aws-lambda-java-core -->
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-lambda-java-core</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------
+
+
+
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.minfy</groupId>
+  <artifactId>userdetailapi</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.6.0</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+          <encoding>UTF-8</encoding>
+          <forceJavacCompilerUse>true</forceJavacCompilerUse>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+       <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <version>3.3.0</version>
+            <executions>
+                <execution>
+                    <id>assemble-layer1</id>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>single</goal>
+                    </goals>
+                    <configuration>
+                        <descriptors>
+                            <descriptor>src/main/assembly/layer1-assembly.xml</descriptor>
+                            <descriptor>src/main/assembly/layer2-assembly.xml</descriptor>
+                        </descriptors>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+  </build>
+
+  <name>userdetailapi</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <profiles>
+    <profile>
+        <id>layer1</id>
+        <dependencies>
+            <!-- Include dependencies for Layer 1 -->
+            <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>aws-java-sdk-dynamodb</artifactId>
+                <version>1.12.542</version>
+            </dependency>
+            
+            <dependency>
+			      <groupId>junit</groupId>
+			      <artifactId>junit</artifactId>
+			      <version>4.12</version>
+			      <scope>test</scope>
+			</dependency>
+			 <dependency>
+                <groupId>com.amazonaws</groupId>
+                <artifactId>aws-java-sdk</artifactId>
+                <version>1.11.1022</version>
+            </dependency>
+			 
+            <!-- Additional dependencies for Layer 1 -->
+        </dependencies>
+    </profile>
+
+    <profile>
+        <id>layer2</id>
+        <dependencies>
+            <!-- Include dependencies for Layer 2 -->
+           
+            
+            <dependency>
+		      <groupId>com.amazonaws</groupId>
+		      <artifactId>aws-lambda-java-core</artifactId>
+		      <version>1.1.0</version>
+       		 </dependency>
+       		 
+			<dependency>
+		      <groupId>com.amazonaws</groupId>
+		      <artifactId>aws-lambda-java-events</artifactId>
+		      <version>1.3.0</version>
+   			 </dependency>
+            <!-- Additional dependencies for Layer 2 -->
+        </dependencies>
+    </profile>
+</profiles>
+
+</project>
+
